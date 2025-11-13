@@ -63,7 +63,7 @@
   .remaining-pill { display: inline-block; background: var(--red); color: #fff; border-radius: 10px; min-width: 4ch; text-align: center; padding: 2px 4px; font-weight: 800; user-select: none; cursor: pointer; }
 
   .btn-pickup { appearance: none; border: 2px solid #000; background: #1e8e3e; color: #fff; border-radius: 10px; padding: 6px 8px; font-weight: 800; cursor: pointer; width: 100%; }
-  .btn-pickup:active { transform: scale(0.98); }
+  .btn-pickup:active { }
 
   /* Sortable header visuals */
   .sortable { cursor: pointer; user-select: none; }
@@ -79,7 +79,7 @@
   .load-btn,
   .load-label { appearance: none; border: 1px solid #000; border-radius: 10px; padding: 2px 2px; font-weight: 500; font-size: .75rem; cursor: pointer; width: 100%; background: #f8fafc; color: #000; text-align:center; display:inline-block; }
   .loaded { background: var(--green) !important; color: #fff !important; }
-  .load-btn:active, .load-label:active { transform: scale(0.98); }
+  .load-btn:active, .load-label:active { }
 
   .vh-file { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 
@@ -428,7 +428,7 @@ table.pickup tbody tr.main-row td:nth-child(2) {
 
   /* Slightly scale down Box 3 content so columns don't clip on the right */
   .row.stock .stock-inner {
-    transform: scale(0.90);
+    
     transform-origin: top left;
   }
 }
