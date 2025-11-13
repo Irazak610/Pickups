@@ -434,6 +434,34 @@ table.pickup tbody tr.main-row td:nth-child(2) {
 }
 </style>
 
+
+<style>
+@media (max-width: 430px) {
+  /* Shrink Box 3 header and cells a bit to keep all columns in the safe width */
+  table.pickup thead th {
+    font-size: 0.75rem;
+  }
+
+  table.pickup tbody tr.main-row td:nth-child(2),
+  table.pickup tbody tr.main-row td:nth-child(3),
+  table.pickup tbody tr.main-row td:nth-child(4) {
+    font-size: 0.9rem;
+  }
+
+  /* Make REM pill and Pickup button narrower */
+  .remaining-pill {
+    font-size: 0.75rem;
+    padding: 1px 3px !important;
+  }
+
+  td.center .btn-pickup,
+  td[data-action-cell="1"] .btn-pickup {
+    font-size: 0.75rem;
+    padding: 2px 6px !important;
+  }
+}
+</style>
+
 </head>
 <body>
   <div class="app">
