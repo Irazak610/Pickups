@@ -1,0 +1,1638 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#111111">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Hospital Pickup Scanner – Renumbered Boxes (v20)</title>
+<style>
+  :root {
+    --border: 1px solid #000;
+    --radius: 10px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    --dark: #0a0f1e;
+    --blackish: #111;
+    --green: #1e8e3e;
+    --red:   #c62828;
+    --yellow:#fbc02d;
+    --navy:  #0f172a;
+    --ink:   #0b1220;
+    --line:  #2b3448;
+    --header: #93c5fd;
+    --cell:  #0f172a;
+    --undo:  #0ea5e9;
+    --muted: #64748b;
+  }
+  html, body { height: 100%; margin: 0; background: white; font-family: var(--font); }
+  
+  .app {
+      max-width: 430px;   /* desktop & large phones */
+      margin: 0 auto;
+      min-height: 100vh;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+
+  /* On smaller devices (iPhone widths), let the app fit exactly in the viewport */
+  @media (max-width: 430px) {
+    .app {
+      max-width: 100vw;
+      width: 100vw;
+    }
+  }
+
+  /* Slightly tighten Box 3 text on very narrow screens so all columns fit */
+  @media (max-width: 400px) {
+    table.pickup thead th {
+      font-size: 0.7rem;
+    }
+    table.pickup tbody tr.main-row td:nth-child(2),
+    table.pickup tbody tr.main-row td:nth-child(3),
+    table.pickup tbody tr.main-row td:nth-child(4) {
+      font-size: 0.9rem !important;
+      padding: 4px 4px !important;
+    }
+    .btn-pickup {
+      font-size: 0.75rem;
+      padding: 4px 8px !important;
+    }
+  }
+
+  .row { border: var(--border); border-radius: var(--radius); padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #fff; }
+
+  /* BOX 1: Status bar (top) */
+  .row.status { flex: 0 0 110px; background: var(--blackish); color: #fff; font-weight: 1000; font-size: 3.8rem; letter-spacing: 1px; }
+
+  /* BOX 2: Scan input (below status) */
+  .row.header { border: 0; padding: 0; border-radius: 0; display: block; flex: 0 0 48px; }
+  .scan-input { width: 100%; height: 38px; border: 1px solid white; background: var(--dark); color: white; border-radius: 10px; outline: none; font-size: 1.5rem; text-align: center; }
+  .scan-input::placeholder { color: #9ccfff; opacity: 0.8; }
+  .scan-input:focus { border-color: #3fa9f5; box-shadow: 0 0 6px #3fa9f5; }
+
+  /* BOX 3: Hospital pickup table */
+  .row.stock { flex: 1 1 auto; text-align:left; font-size:0.7rem; overflow: auto; padding: 4px 8px 12px 4px; }
+  .stock-inner { width: 100%; height: 100%; overflow: auto; }
+  table.pickup { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.pickup thead th {
+    border-bottom: 1px solid #000; padding: 2px; font-size: 0.8rem;
+    white-space: normal; word-break: break-word;
+    position: sticky; top: 0; background: #fff; z-index: 3;
+    text-align: left;
+  }
+  th.col-qty, th.col-remaining, th.col-serial, th.col-class { text-align: center !important; }
+
+  table.pickup tbody td { border-bottom: 1px solid #000; padding: 6px; vertical-align: middle; word-wrap: break-word; overflow-wrap: anywhere; color: var(--cell); }
+  th.col-idx { width: 44px; } th.col-product { width: 16%; } th.col-class { width: 12%; }
+  th.col-desc { width: 32%; } th.col-qty { width: 10%; } th.col-serial { width: 12%; }
+  th.col-remaining { width: 12%; } th.col-action { width: 10%; text-align: center; }
+  td.center { text-align: center; }
+  .remaining-pill { display: inline-block; background: var(--red); color: #fff; border-radius: 10px; min-width: 4ch; text-align: center; padding: 2px 4px; font-weight: 800; user-select: none; cursor: pointer; }
+
+  .btn-pickup { appearance: none; border: 2px solid #000; background: #1e8e3e; color: #fff; border-radius: 10px; padding: 6px 8px; font-weight: 800; cursor: pointer; width: 100%; }
+  .btn-pickup:active { transform: scale(0.98); }
+
+  /* Sortable header visuals */
+  .sortable { cursor: pointer; user-select: none; }
+  .sort-ind { font-weight: 900; margin-left: 6px; opacity: .85; }
+
+  /* BOX 4: File loaders (template/load/hospital pickup) */
+  .row.load  { flex: 0 0 12px; padding: 1px; justify-content: center; }
+  .load-grid { width: 80%; display: grid; grid-template-columns: repeat(2, 1fr); justify-content: center; gap: 80px; }
+  .load-wrapper { display:flex; justify-content:center; width:100%; }
+  .load-col{ display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .file-name{ font-size: .45rem; color: var(--muted); font-weight: 600; min-height: 1.2em; word-break: break-all; }
+  .file-count{ font-size: .45rem; color: var(--muted); min-height: 1.2em; }
+  .load-btn,
+  .load-label { appearance: none; border: 1px solid #000; border-radius: 10px; padding: 2px 2px; font-weight: 500; font-size: .75rem; cursor: pointer; width: 100%; background: #f8fafc; color: #000; text-align:center; display:inline-block; }
+  .loaded { background: var(--green) !important; color: #fff !important; }
+  .load-btn:active, .load-label:active { transform: scale(0.98); }
+
+  .vh-file { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+
+  /* BOX 5: Recent scans + controls */
+  .row.recent { flex: 0 0 auto; display: block; padding: 2px; }
+  .recent-toggle { width: 100%; appearance: none; background: var(--blackish); color: #fff; border: 2px solid #000; border-radius: 10px; padding: 2px 2px; font-weight: 800; font-size: .75rem; cursor: pointer; text-align: left; display: flex; align-items: center; justify-content: space-between; }
+  .toggle-right { display:flex; align-items:center; gap:2px; }
+  .badge { display:inline-block; min-width: .75em; padding: 2px 2px; border-radius: 999px; background: #334155; color: #fff; font-weight: 800; text-align:center; }
+  .caret { display: inline-block; transition: transform .2s ease; } .caret.open { transform: rotate(90deg); }
+  .recent-panel { margin-top: 2px; border: 2px solid #000; border-radius: 10px; padding: 0; max-height: 18vh; overflow: auto; display: none; background: var(--ink); }
+  .recent-panel.open { display: block; }
+
+  table.recent-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .recent-table col.rt-time   { width: 22%; }
+  .recent-table col.rt-type   { width: 16%; }
+  .recent-table col.rt-product{ width: 28%; }
+  .recent-table col.rt-lot    { width: 18%; }
+  .recent-table col.rt-status { width: 16%; }
+  table.recent-table thead th { position: sticky; top: 0; background: var(--navy); color: var(--header); text-align: left; padding: 2px; border-bottom: 2px solid var(--line); font-weight: 700; }
+  table.recent-table tbody td { color: #cbd5e1; padding: 2px; border-bottom: 1px solid var(--line); font-size: 0.75rem; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+  .undo-btn { appearance: none; border: 1px solid var(--undo); color: #fff; background: var(--undo); border-radius: 10px; padding: 2px 4px; font-weight: 600; cursor: pointer; margin-left: 6px; }
+
+  .recent-actions { display:flex; gap:4px; margin-top:4px; }
+  .recent-actions .btn { appearance: none; border: 2px solid #000; border-radius: 10px; padding: 2px 2px; font-weight: 600; cursor: pointer; background:#f1f5f9; }
+  .btn.reset { background:#fee2e2; }
+  .btn.download { background:#dcfce7; }
+
+/* === UI Tweaks: center # header, compact remaining pill, compact Pickup button === */
+th.col-idx { text-align: center !important; }
+.remaining-pill { min-width: 2ch !important; padding: 2px 4px !important; }
+td.center .btn-pickup, td[data-action-cell="1"] .btn-pickup {
+  width: auto !important;
+  display: inline-block !important;
+  padding: 6px 10px !important;
+}
+
+
+<style>
+/* Center all # column cells */
+#stockTable th:first-child, 
+#stockTable td:first-child {
+  text-align: center !important;
+}
+
+/* Center Action column */
+#stockTable th.action-col, 
+#stockTable td.action-col {
+  text-align: center !important;
+}
+
+/* Ensure Pickup button is centered and compact */
+.btn-pickup {
+  display: inline-block !important;
+  text-align: center !important;
+  width: auto !important;
+  padding: 5px 10px !important;
+  margin: 0 auto !important;
+}
+
+/* Center all Box 5 table columns */
+#recentTable th, 
+#recentTable td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+/* Ensure pills and numbers are neatly centered */
+#recentTable td .pill,
+#stockTable td .pill {
+  display: inline-block;
+  text-align: center;
+}
+
+<style>
+/* --- Centering rules for Box 3 (Stock / Hospital Pickup table) --- */
+#stockTable th:first-child,
+#stockTable td:first-child {
+  text-align: center !important;         /* Center the # column */
+  vertical-align: middle !important;
+}
+
+/* Fallback if table id differs */
+table[data-box="3"] th:first-child,
+table[data-box="3"] td:first-child {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+/* Center Action column cells once we tag them via JS */
+th.action-col, td.action-col {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+/* Compact and centered Pickup button */
+td.action-col .btn-pickup,
+td.action-col button {
+  display: inline-block !important;
+  margin: 0 auto !important;
+  width: auto !important;
+  padding: 6px 10px !important;
+  white-space: nowrap;
+}
+
+/* --- Centering rules for Box 5 (Recent Scans) --- */
+#recentTable th, #recentTable td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+/* Fallback: recent panel class/table */
+#recentPanel table th, #recentPanel table td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+</style>
+
+</style>
+
+</style>
+
+<style>
+/* Hide #, Qty, and Description columns on main rows */
+table.pickup thead th:nth-child(1),
+table.pickup thead th:nth-child(5),
+table.pickup thead th:nth-child(6),
+table.pickup tbody tr.main-row td:nth-child(1),
+table.pickup tbody tr.main-row td:nth-child(5),
+table.pickup tbody tr.main-row td:nth-child(6) {
+  display: none !important;
+}
+
+/* Prevent wrapping for Product and Serial; ellipsis if too long */
+table.pickup thead th:nth-child(2),
+table.pickup tbody tr.main-row td:nth-child(2),
+table.pickup thead th:nth-child(3),
+table.pickup tbody tr.main-row td:nth-child(3) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Description second row styling */
+table.pickup tbody tr.desc-row td.desc-cell {
+  font-size: 0.7rem;
+  color: var(--muted);
+  padding: 2px 8px 6px 8px;
+  white-space: normal !important;
+}
+/* Mobile: re-allocate Box 3 widths so visible columns use full space */
+@media (max-width: 480px) {
+  /* Hidden columns should not consume width */
+  table.pickup thead th:nth-child(1),
+  table.pickup thead th:nth-child(5),
+  table.pickup thead th:nth-child(6),
+  table.pickup tbody tr.main-row td:nth-child(1),
+  table.pickup tbody tr.main-row td:nth-child(5),
+  table.pickup tbody tr.main-row td:nth-child(6) {
+    width: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Visible header column widths:
+     give Product + Serial most of the space */
+  th.col-product   { width: 42% !important; }
+  th.col-serial    { width: 30% !important; }
+  th.col-class     { width: 10% !important; }
+  th.col-remaining { width: 8%  !important; }
+  th.col-action    { width: 10% !important; text-align: center !important; }
+
+  /* Keep headers and main row cells on one line */
+  th.col-product,
+  th.col-serial,
+  th.col-class,
+  th.col-remaining,
+  th.col-action,
+  table.pickup tbody tr.main-row td:nth-child(2),
+  table.pickup tbody tr.main-row td:nth-child(3),
+  table.pickup tbody tr.main-row td:nth-child(4),
+  table.pickup tbody tr.main-row td:nth-child(7),
+  table.pickup tbody tr.main-row td:nth-child(8) {
+    white-space: nowrap !important;
+  }
+
+  /* Ensure 'Action' header never wraps */
+  th.col-action {
+    word-break: keep-all !important;
+  }
+
+  /* Let Product + Serial text ellipsis if still too long */
+  table.pickup tbody tr.main-row td:nth-child(2),
+  table.pickup tbody tr.main-row td:nth-child(3) {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
+/* Compact remaining pill */
+.remaining-pill { min-width: 2ch !important; padding: 2px 4px !important; }
+</style>
+
+
+  <!-- Mobile consistency overrides injected by ChatGPT -->
+  <style>
+    /* Prevent Safari auto-zoom / font resizing so all iPhones look the same */
+    html, body {
+      -webkit-text-size-adjust: 100% !important;
+    }
+
+    body {
+      overscroll-behavior: contain;
+      background: #ffffff;
+    }
+
+    /* Standardize app width across different iPhones */
+    .app {
+      max-width: 430px;   /* approx iPhone 14 width */
+      margin: 0 auto;
+      min-height: 100vh;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+  </style>
+
+
+  
+<style>
+/* Global Box 3 (Hospital Pickup) layout tuning */
+table.pickup {
+  width: 100% !important;
+  table-layout: auto !important;
+}
+
+/* Hide #, Qty, Description columns from the main row so they don't affect layout */
+table.pickup thead th.col-idx,
+table.pickup thead th.col-qty,
+table.pickup thead th.col-desc {
+  display: none !important;
+}
+
+table.pickup tbody tr.main-row td:nth-child(1),  /* # */
+table.pickup tbody tr.main-row td:nth-child(5),  /* Qty */
+table.pickup tbody tr.main-row td:nth-child(6) { /* Description copy in main row */
+  display: none !important;
+}
+
+/* Keep first-row cells on one line with truncation */
+table.pickup thead th,
+table.pickup tbody tr.main-row td {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Ensure right-side columns stay tight and don't wrap */
+table.pickup thead th.col-class,
+table.pickup tbody tr.main-row td:nth-child(4),
+table.pickup thead th.col-remaining,
+table.pickup tbody tr.main-row td:nth-child(7),
+table.pickup thead th.col-action,
+table.pickup tbody tr.main-row td:nth-child(8) {
+  text-align: center !important;
+}
+
+/* 'Action' header must never split */
+table.pickup thead th.col-action {
+  word-break: keep-all !important;
+}
+
+/* Description row: full-width, normal wrapping */
+table.pickup tbody tr.desc-row td.desc-cell {
+  display: table-cell !important;
+  padding: 2px 8px 6px 8px !important;
+  font-size: 0.7rem !important;
+  color: #64748b !important;
+  white-space: normal !important;
+}
+</style>
+
+
+<style>
+/* Box 3 row separators:
+   - No line between the main row and its description row
+   - Single separator line only after the description row
+*/
+table.pickup tbody tr.main-row td {
+  border-bottom: none !important;
+}
+
+table.pickup tbody tr.desc-row td.desc-cell {
+  border-top: none !important;
+  border-bottom: 1px solid #00000022 !important; /* light separator between different stock items */
+}
+</style>
+
+
+<style>
+/* Increase font size for Product, Serial, Class (main row) */
+table.pickup tbody tr.main-row td:nth-child(2), /* Product */
+table.pickup tbody tr.main-row td:nth-child(3), /* Serial */
+table.pickup tbody tr.main-row td:nth-child(4)  /* Class */ {
+    font-size: 1rem !important;
+}
+
+/* Bold the Product field */
+table.pickup tbody tr.main-row td:nth-child(2) {
+    font-weight: 700 !important;
+}
+</style>
+
+
+<style>
+/* Hide scrollbar for pickup table container while keeping scroll functionality */
+#pickupContainer::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+}
+#pickupContainer {
+    -ms-overflow-style: none !important;  /* IE & Edge */
+    scrollbar-width: none !important;     /* Firefox */
+}
+</style>
+
+
+<style>
+/* Hide scrollbar in Box 3 scroll container */
+.stock-inner::-webkit-scrollbar { 
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+.stock-inner {
+    -ms-overflow-style: none !important;  /* IE/Edge */
+    scrollbar-width: none !important;     /* Firefox */
+}
+</style>
+
+</head>
+<body>
+  <div class="app">
+
+    <!-- BOX 1: Status bar -->
+    <div id="statusBox" class="row status" aria-live="polite"></div>
+
+    <!-- BOX 2: Scan input -->
+    <div class="row header">
+      <input id="scanField" class="scan-input" type="text" placeholder="Scan here..." autofocus />
+    </div>
+
+    <!-- BOX 3: Hospital pickup table -->
+    <div class="row stock">
+      <div class="stock-inner">
+        <table class="pickup" id="pickupTable" aria-label="Hospital Pickup List">
+          <thead>
+            <tr>
+              <th class="col-idx sortable" data-sort="index"># <span id="sortIndex" class="sort-ind"></span></th>
+              <th class="col-product sortable" data-sort="product">Product <span id="sortProduct" class="sort-ind"></span></th>
+              <th class="col-serial">Serial</th>
+              <th class="col-class sortable" data-sort="productClass">Class <span id="sortClass" class="sort-ind"></span></th>
+              <th class="col-qty">Qty</th>
+              <th class="col-desc">Description</th>
+              <th class="col-remaining">REM</th>
+              <th class="col-action">Action</th>
+            </tr>
+          </thead>
+          <tbody id="pickupTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BOX 4: File loaders -->
+    <div class="row load">
+      <div class="load-wrapper">
+        <div class="load-grid">
+          <div class="load-col">
+            <div id="pickupFileName" class="file-name"></div>
+            <label for="inputPickup" id="btnLoadPickup" class="load-label">Load Hospital</label>
+            <input id="inputPickup" class="vh-file" type="file" accept=".csv,.txt" />
+            <div id="pickupCount" class="file-count"></div>
+          </div>
+          <div class="load-col">
+            <div class="file-name">&nbsp;</div>
+            <button id="btnExportMissing" type="button" class="load-btn">Export Missing</button>
+            <div class="file-count">CSV of current missing</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<!-- BOX 5: Recent scans + controls -->
+    <div class="row recent">
+      <button id="recentToggle" class="recent-toggle" type="button">
+        Recent Scans
+        <span class="toggle-right">
+          <span id="recentBadge" class="badge">0</span>
+          <span id="caret" class="caret">▶</span>
+        </span>
+      </button>
+      <div id="recentPanel" class="recent-panel" aria-live="polite">
+        <table class="recent-table">
+          <colgroup>
+            <col class="rt-time" />
+            <col class="rt-type" />
+            <col class="rt-product" />
+            <col class="rt-lot" />
+            <col class="rt-status" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Scan</th>
+              <th>Product</th>
+              <th>Raw Lot</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="recentTbody"></tbody>
+        </table>
+      </div>
+      <div class="recent-actions">
+        <button id="btnResetLog" class="btn reset" type="button">Reset Log</button>
+        <button id="btnDownloadLog" class="btn download" type="button">Download Log</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* NOTE: Full logic is identical to v19 (sequential load, sort-safe _id mapping, undo/reset, CSV export, etc.).
+   To keep this patch focused on the renumbering request, we simply re-use the v19 script by inclusion.
+   If you want this file to be fully standalone without referencing v19, we can inline the entire v19 JS here too. */
+</script>
+<!-- For convenience, embed v19 script directly so v20 is standalone -->
+<script>
+(() => {
+  // --- GTIN map support ---
+  const gtinMap = new Map(); // key: 12-digit GTIN (digits only) -> { itemNumber, edi, gtin }
+  function normalizeDigits(s){ return String(s||'').replace(/\D+/g,''); }
+  function setGTINLoaded(ok, name, count){
+    try{
+      const b = document.getElementById('btnLoadGTIN');
+      if(b) b.classList.toggle('loaded', !!ok);
+      const n = document.getElementById('gtinFileName');
+      const c = document.getElementById('gtinCount');
+      if(n) n.textContent = name || '';
+      if(c) c.textContent = (count!=null ? ('Rows loaded: '+count) : '');
+    }catch(e){}
+  }
+
+
+  function stripAfterArrow(s){
+    // Ignore anything after the special arrow separator (↔)
+    const idx = String(s||'').indexOf('↔');
+    return idx >= 0 ? String(s).slice(0, idx) : String(s||'');
+  }
+
+  const recent = [];
+  let templateFileObj = null;
+  // Z‑tag lookup: middle number (Column A) -> Product code (Column B)
+  const templateMap = new Map();
+  // zCompleted no longer used; duplicate detection is Recent-based
+  // const zCompleted = new Set();
+
+  let pickupFileObj = null;
+  let sequentialLoadMode = false;
+
+  const byId = new Map();
+  let nextRowId = 1;
+
+  function nowTime12(){
+    const d = new Date();
+    let hh = d.getHours();
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    const ss = String(d.getSeconds()).padStart(2,'0');
+    const ampm = hh >= 12 ? 'PM' : 'AM';
+    hh = hh % 12; if(hh === 0) hh = 12;
+    return hh + ':' + mm + ':' + ss + ' ' + ampm;
+  }
+
+  const scanField  = document.getElementById('scanField');
+  const statusBox  = document.getElementById('statusBox');
+  let statusTimer  = null;
+  function resetStatus(){ statusBox.style.background = '#111'; statusBox.style.color = '#fff'; statusBox.textContent = 'Scan Now'; }
+  function setStatus(colorName, text){
+    const colors = { green:'#1e8e3e', red:'#c62828', yellow:'#fbc02d' };
+    const bg = colors[colorName] || '#111';
+    statusBox.style.background = bg;
+    statusBox.style.color = (colorName === 'yellow') ? '#000' : '#fff';
+    statusBox.textContent = text;
+    if(statusTimer){ clearTimeout(statusTimer); }
+    if(colorName !== 'yellow'){ statusTimer = setTimeout(resetStatus, 1500); }
+  }
+
+  // --- Pending state for non-Z two-step ---
+  let pendingProductNZ = null;
+  function normALNUM(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+  function isZPrefix(s){ return /^\s*Z\s*-/i.test(String(s||'')); }
+  function showYellow(){ setStatus('yellow','Product OK — scan LOT'); }
+
+  function csvParse(text){
+    const rows = [];
+    let i = 0, field = '', row = [], inQuotes = false;
+    while(i < text.length){
+      const c = text[i];
+      if(inQuotes){
+        if(c === '"'){ if(text[i+1] === '"'){ field += '"'; i++; } else { inQuotes = false; } }
+        else { field += c; }
+      } else {
+        if(c === '"'){ inQuotes = true; }
+        else if(c === ','){ row.push(field); field=''; }
+        else if(c === '\n'){ row.push(field); field=''; rows.push(row); row=[]; }
+        else if(c === '\r'){}
+        else { field += c; }
+      }
+      i++;
+    }
+    if(field.length || row.length){ row.push(field); rows.push(row); }
+    return rows;
+  }
+  function toIntOrZero(v){ const n = parseInt(String(v||'').trim(),10); return Number.isFinite(n)?n:0; }
+  function looksLikeHeader(cells){
+    if(!cells) return false;
+    const s = cells.map(x => String(x||'').toLowerCase().trim());
+    return s.includes('product') && s.includes('description') && (s.includes('quantity available')||s.includes('qty')||s.includes('quantity')) &&
+           (s.includes('raw lot') || s.includes('serial') || s.includes('rawlot')) && (s.includes('impl/inst') || s.includes('product class') || s.includes('productclass'));
+  }
+
+  let pickupData = [];
+      window.pickupData = pickupData;
+      window.pickupData = pickupData;
+  let sortState = { key: null, dir: null };
+  const pickupTbody = document.getElementById('pickupTbody');
+
+  function normKey(v){
+    const s = String(v ?? '').trim();
+    const lower = s.toLowerCase();
+    const leadNumMatch = lower.match(/^\d+/);
+    if(leadNumMatch){
+      const num = parseInt(leadNumMatch[0], 10);
+      const rest = lower.slice(leadNumMatch[0].length);
+      return { t:0, n:num, r:rest };
+    }
+    return { t:1, n:0, r:lower };
+  }
+  function cmpNumericFirst(a, b){
+    if(a.t !== b.t) return a.t - b.t;
+    if(a.t === 0 && b.t === 0){
+      if(a.n !== b.n) return a.n - b.n;
+      return a.r.localeCompare(b.r);
+    }
+    return a.r.localeCompare(b.r);
+  }
+
+  function renderPickupTable(){
+    const rows = pickupData.filter(r => r.active);
+    pickupTbody.innerHTML = '';
+    let visualIndex = 1;
+    rows.forEach((r) => {
+      const mainTr = document.createElement('tr');
+      mainTr.className = 'main-row';
+      mainTr.innerHTML = `
+        <td class="center">${visualIndex++}</td>
+        <td>${r.product || ''}</td>
+        <td class="center">${r.serial || ''}</td>
+        <td class="center">${r.productClass || ''}</td>
+        <td class="center">${r.qty}</td>
+        <td>${r.description || ''}</td>
+        <td class="center"><span class="remaining-pill" data-id="${r._id}">${r.remaining}</span></td>
+        <td class="center" data-action-cell="1" data-id="${r._id}"><button class="btn-pickup" data-id="${r._id}" type="button">Pickup</button></td>
+      `;
+      const descTr = document.createElement('tr');
+      descTr.className = 'desc-row';
+      descTr.innerHTML = `
+        <td class="desc-cell" colspan="8">${r.description || ''}</td>
+      `;
+      pickupTbody.appendChild(mainTr);
+      pickupTbody.appendChild(descTr);
+    });
+  }
+
+  function renderRecent(){
+    const recentTbodyRef = document.getElementById('recentTbody');
+    const badgeEl = document.getElementById('recentBadge');
+    if(!recent.length){
+      recentTbodyRef.innerHTML = '<tr><td colspan="5" style="color:#9aa4b2; padding:8px;">No scans yet.</td></tr>';
+      badgeEl.textContent = '0';
+      return;
+    }
+    recentTbodyRef.innerHTML = recent.map(e => {
+      const undoBtn = (e.status === 'PICKUP') ? `<button class="undo-btn" data-id="${e.id}">Undo</button>` : '';
+      return `<tr>
+        <td class="mono">${e.time}</td>
+        <td>${e.type}</td>
+        <td class="mono">${e.product || ''}</td>
+        <td class="mono">${e.lot || ''}</td>
+        <td>${e.status}${undoBtn ? ' ' + undoBtn : ''}</td>
+      </tr>`;
+    }).join('');
+    badgeEl.textContent = String(recent.length);
+    recentTbodyRef.querySelectorAll('.undo-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.getAttribute('data-id'));
+        const i = recent.findIndex(x => x.id === id);
+        if(i >= 0 && recent[i].status === 'PICKUP'){
+          restoreFromEntry(recent[i]);
+          recent.splice(i,1);
+          renderPickupTable();
+          renderRecent();
+        }
+      });
+    });
+  }
+
+  function pushLog(entry){
+    entry.id = (pushLog._id = (pushLog._id || 0) + 1);
+    recent.unshift(entry);
+    if(recent.length > 200) recent.pop();
+    renderRecent();
+  }
+
+  function decrementRemainingById(rowId, sourceType){
+    const row = byId.get(rowId);
+    if(!row) return;
+    if(row.remaining > 1){
+      row.remaining -= 1;
+      pushLog({ time: nowTime12(), type: sourceType || 'SCANNED', product: row.product, lot: row.serial, status: 'PICKUP' });
+    } else if(row.remaining === 1){
+      row.remaining = 0; row.active = false;
+      pushLog({ time: nowTime12(), type: sourceType || 'SCANNED', product: row.product, lot: row.serial, status: 'PICKUP' });
+    }
+    if (sourceType === 'MANUAL') setStatus('green','Pick Up');
+    renderPickupTable();
+  }
+
+  function restoreFromEntry(entry){
+    if(!entry || entry.status !== 'PICKUP') return;
+    const prod = String(entry.product ?? '').replace(/\D+/g,'');
+    const lot  = String(entry.lot ?? '').replace(/\D+/g,'');
+    if(!prod || !lot) return;
+    const row = pickupData.find(r =>
+      String(r.product).replace(/\D+/g,'') === prod &&
+      String(r.serial).replace(/\D+/g,'') === lot
+    );
+    if(row){
+      row.remaining = Math.min(row.qty, (row.remaining || 0) + 1);
+      row.active = row.remaining > 0;
+    }
+  }
+
+  const pickupTbodyEl = document.getElementById('pickupTbody');
+  pickupTbodyEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-pickup');
+    if(btn){
+      const id = Number(btn.getAttribute('data-id'));
+      if(Number.isFinite(id)) decrementRemainingById(id, 'MANUAL');
+      return;
+    }
+    const pill = e.target.closest('.remaining-pill');
+    if(pill){
+      const id = Number(pill.getAttribute('data-id'));
+      if(Number.isFinite(id)) decrementRemainingById(id, 'MANUAL');
+      return;
+    }
+    const cell = e.target.closest('td[data-action-cell="1"]');
+    if(cell){
+      const id = Number(cell.getAttribute('data-id'));
+      if(Number.isFinite(id)) decrementRemainingById(id, 'MANUAL');
+      return;
+    }
+  });
+
+  
+function parseScan(raw){
+    const s = String(raw||'').trim();
+    if(!s) return {product:null, lot:null};
+    const parts = s.split('-').map(x=>x.trim()).filter(Boolean);
+    let middle=null, lot=null;
+    if(parts.length >= 2){
+      middle = parts.length>=3 ? parts[parts.length-2] : parts[0];
+      lot    = parts[parts.length-1];
+    } else {
+      const nums = s.match(/\d+/g) || [];
+      middle = nums[0] || null;
+      lot    = nums[1] || null;
+    }
+    middle = middle ? middle.replace(/\D+/g,'') : null;
+    lot    = lot    ? lot.replace(/\D+/g,'') : null;
+    let product = middle || null;
+    if(middle && templateMap.has(String(middle))){
+      product = templateMap.get(String(middle)).productCode || middle;
+    }
+    return {product: product || null, lot: lot || null};
+  }
+  function applyScanToRemaining(raw){
+    const {product, lot} = parseScan(raw);
+    if(!product || !lot) return false;
+    const prodNorm = normalizeProduct(product);
+    const isZ = isZTag(raw);
+
+    // If this is a Z‑tag and we already logged a PICKUP for this kit (not undone), treat as duplicate
+    if(isZ && hasActivePickup(product, lot)){
+      pushLog({ time: nowTime12(), type: 'SCANNED', product, lot, status: 'PICKUP (duplicate)' });
+      return true; // trigger green status
+    }
+
+    // Normal path: find matching row by Product then Serial with remaining > 0
+    const candidates = pickupData.filter(r => normalizeProduct(r.product) === prodNorm && (r.remaining||0) > 0);
+    const row = candidates.find(r => lotNum(r.serial) === lotNum(lot));
+    if(row){
+      decrementRemainingById(row._id, 'SCANNED'); // this logs a PICKUP and updates Remaining
+      return true;
+    }
+
+    // No match -> LEAVE
+    pushLog({ time: nowTime12(), type: 'SCANNED', product, lot, status: 'LEAVE' });
+    return false;
+  }
+  
+  // Custom GS1 parser: skip first 4 digits, next 12 -> GTIN key, skip next 10, remainder is LOT
+  function parseGS1Custom(raw){
+    const s = String(raw||'').replace(/\s+/g,'').trim();
+    if(!/^01\d{14}/.test(s)) return null; // must start with 01 + 14 digits
+    const key12 = s.slice(4,16);
+    const after = s.slice(16);
+    if(after.length < 10) return null;
+    const lot = after.slice(10);
+    return { key12, lot: (lot||'').toUpperCase() };
+  }
+function processScan(raw){
+    const code = stripAfterArrow((raw || '')).trim();
+    if(!code) return;
+
+    // Z-tag first
+    if(isZTag(code)){
+      const matched = applyScanToRemaining(code);
+      setStatus(matched ? 'green':'red', matched ? 'Pick Up' : 'Leave');
+      scanField.value=''; return;
+    }
+
+
+    // GS1 custom (01 + 14) using GTIN map
+    { const g = parseGS1Custom(code); if(g && gtinMap.size){
+        const mapRow = gtinMap.get(g.key12) || gtinMap.get(g.key12.replace(/^0+/, ''));
+        if(mapRow){
+          const prodNorm = normalizeProduct(mapRow.itemNumber || mapRow.edi || '');
+          const candidates = (window.pickupData||[]).filter(r => normalizeProduct(r.product) === prodNorm && (r.remaining||0) > 0);
+
+          // --- exact lot match first (as-is) ---
+          let wantLotAlpha = String(g.lot || '').toUpperCase();
+          let row = candidates.find(r => String(r.serial || '').toUpperCase().replace(/\s+/g,'') === wantLotAlpha);
+
+          // --- if not found, try digits-only equality ---
+          if(!row){
+            const want = lotNum(g.lot);
+            row = candidates.find(r => lotNum(r.serial) === want);
+          }
+
+          // --- if still not found, handle phone-scanner trailer artifact: strip a terminal '2411\d{5,}' ---
+          if(!row){
+            const m = wantLotAlpha.match(/^(.*?)(?:2411\d{5,})$/);
+            if(m){
+              const trimmedAlpha = m[1];
+              // exact alpha match
+              row = candidates.find(r => String(r.serial || '').toUpperCase().replace(/\s+/g,'') === trimmedAlpha)
+                   || candidates.find(r => lotNum(r.serial) === lotNum(trimmedAlpha));
+            }
+          }
+
+          // --- fuzzy (off-by-one tail) as the last resort ---
+          if(!row){
+            const want = lotNum(g.lot);
+            row = candidates.find(r => {
+              const have = lotNum(r.serial);
+              if(Math.abs(have.length - want.length) !== 1) return false;
+              const minLen = Math.min(have.length, want.length);
+              let pref=0; for(let i=0;i<minLen;i++){ 
+                if(have[i]===want[i]) pref++; else break; 
+              }
+              return pref >= Math.max(4, minLen-3);
+            });
+          }
+
+          if(row){
+            decrementRemainingById(row._id, 'SCANNED'); setStatus('green','Pick Up');
+          } else {
+            try{ pushLog({ time: nowTime12(), type:'SCANNED', product:(mapRow.itemNumber||''), lot: g.lot, status:'LEAVE' }); }catch(e){}
+            setStatus('red','Leave');
+          }
+          scanField.value=''; return;
+        }
+      } }
+    // Try GS1 / HIBC direct Product+Lot first (no yellow pending)
+    try{
+      let pair = parseGS1Pair && parseGS1Pair(code);
+      if(!pair && /^\+H/i.test(code)) pair = parseHIBC_byRule && parseHIBC_byRule(code);
+      if(pair && pair.product && pair.lot){
+        const prodKey = normalizeProduct(gtinToStockKey(pair.product));
+        const candidates = pickupData.filter(r => normalizeProduct(r.product) === prodKey && (r.remaining||0) > 0);
+        // Exact lot match first
+        let row = candidates.find(r => lotNum(r.serial) === lotNum(pair.lot));
+        // Fuzzy fallback when off-by-one at the tail (longest common prefix), only if exact not found
+        if(!row){
+          const want = lotNum(pair.lot);
+          row = candidates.find(r => {
+            const have = lotNum(r.serial);
+            if(Math.abs(have.length - want.length) !== 1) return false;
+            const minLen = Math.min(have.length, want.length);
+            let pref=0; for(let i=0;i<minLen;i++){ if(have[i]===want[i]) pref++; else break; }
+            return pref >= Math.max(4, minLen-3);
+          });
+        }
+        if(row){
+          decrementRemainingById(row._id, 'SCANNED'); setStatus('green','Pick Up');
+        } else {
+          try{ pushLog({ time: nowTime12(), type:'SCANNED', product: pair.product, lot: pair.lot, status:'LEAVE' }); }catch(e){}
+          setStatus('red','Leave');
+        }
+        scanField.value='';
+        return;
+      }
+    }catch(e){ /* continue to other branches */ }
+
+    // Non-Z two-step: product-only -> Yellow pending, then next scan as lot
+    if(!isZPrefix(code)){
+      if(!pendingProductNZ){
+        // Check for direct product+lot in one scan (separators: space, comma, semicolon, pipe, slash, dash)
+        const both = code.match(/^\s*([A-Za-z0-9\-]+)[\s,;|/\\]+([A-Za-z0-9\-]+)\s*$/);
+        if(both){
+          const prod = both[1];
+          const lot  = both[2];
+          // Try direct match
+          const prodNorm = normalizeProduct(prod);
+          const candidates = pickupData.filter(r => normalizeProduct(r.product) === prodNorm && (r.remaining||0) > 0);
+          const row = candidates.find(r => lotNum(r.serial) === lotNum(lot));
+          if(row){
+            decrementRemainingById(row._id, 'SCANNED');
+            setStatus('green','Pick Up');
+          } else {
+            pushLog({ time: nowTime12(), type: 'SCANNED', product: prod, lot: lot, status: 'LEAVE' });
+            setStatus('red','Leave');
+          }
+          scanField.value = '';
+          return;
+        }
+        // Otherwise treat as PRODUCT-only: enter pending
+        pendingProductNZ = code;
+        showYellow(); // persistent until next scan
+        scanField.value = '';
+        return;
+      } else {
+        // We have pending product; this scan is LOT
+        const prod = pendingProductNZ;
+        const lot  = code;
+        pendingProductNZ = null; // clear pending (do not reset status here; green/red will handle timer)
+        const prodNorm = normalizeProduct(prod);
+        const candidates = pickupData.filter(r => normalizeProduct(r.product) === prodNorm && (r.remaining||0) > 0);
+        const row = candidates.find(r => lotNum(r.serial) === lotNum(lot));
+        if(row){
+          decrementRemainingById(row._id, 'SCANNED');
+          setStatus('green','Pick Up');
+        } else {
+          pushLog({ time: nowTime12(), type: 'SCANNED', product: prod, lot: lot, status: 'LEAVE' });
+          setStatus('red','Leave');
+        }
+        scanField.value = '';
+        return;
+      }
+    }
+
+    // Z-tag & baseline path
+    const matched = applyScanToRemaining(code);
+    if(matched) setStatus('green','Pick Up'); else setStatus('red','Leave');
+    scanField.value = '';
+  }
+  scanField.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); processScan(scanField.value); } });
+  scanField.addEventListener('change', () => processScan(scanField.value));
+
+  const headerElIndex   = document.querySelector('th[data-sort="index"]');
+  const headerElProduct = document.querySelector('th[data-sort="product"]');
+  const headerElClass   = document.querySelector('th[data-sort="productClass"]');
+  const sortSpanIndex   = document.getElementById('sortIndex');
+  const sortSpanProduct = document.getElementById('sortProduct');
+  const sortSpanClass   = document.getElementById('sortClass');
+
+  function setSortIndicator(){
+    const map = { index: sortSpanIndex, product: sortSpanProduct, productClass: sortSpanClass };
+    ['index','product','productClass'].forEach(k => { map[k].textContent = ''; });
+    if(!sortState.key || !sortState.dir) return;
+    const arrow = sortState.dir === 'asc' ? '▲' : '▼';
+    (map[sortState.key] || {}).textContent = arrow;
+  }
+
+  function cycleSort(key){
+    if(sortState.key !== key){
+      sortState.key = key; sortState.dir = 'asc';
+    } else if(sortState.dir === 'asc'){
+      sortState.dir = 'desc';
+    } else if(sortState.dir === 'desc'){
+      sortState.key = null; sortState.dir = null;
+    } else {
+      sortState.dir = 'asc';
+    }
+    applySort();
+    setSortIndicator();
+    renderPickupTable();
+  }
+
+  function applySort(){
+    if(!sortState.key || !sortState.dir){
+      pickupData.sort((a,b)=> a.originalIndex - b.originalIndex);
+      return;
+    }
+    const dirMul = sortState.dir === 'asc' ? 1 : -1;
+    if(sortState.key === 'index'){
+      pickupData.sort((a,b) => (a.originalIndex - b.originalIndex) * dirMul);
+    } else if(sortState.key === 'product'){
+      pickupData.sort((a,b) => cmpNumericFirst(normKey(a.product), normKey(b.product)) * dirMul);
+    } else if(sortState.key === 'productClass'){
+      pickupData.sort((a,b) => cmpNumericFirst(normKey(a.productClass), normKey(b.productClass)) * dirMul);
+    }
+  }
+
+  headerElIndex.addEventListener('click',   () => cycleSort('index'));
+  headerElProduct.addEventListener('click', () => cycleSort('product'));
+  headerElClass.addEventListener('click',   () => cycleSort('productClass'));
+
+  const recentToggle = document.getElementById('recentToggle');
+  const caret = document.getElementById('caret');
+  const recentPanel = document.getElementById('recentPanel');
+  recentToggle.addEventListener('click', () => { recentPanel.classList.toggle('open'); caret.classList.toggle('open'); });
+
+  const btnResetLog = document.getElementById('btnResetLog');
+  const btnDownloadLog = document.getElementById('btnDownloadLog');
+  btnResetLog.addEventListener('click', () => {
+    if(!recent.length) return;
+    if(!confirm('Reset log and restore PICKUPs to the missing list?')) return;
+    for(const entry of recent){
+      if(entry.status === 'PICKUP') restoreFromEntry(entry);
+    }
+    recent.splice(0, recent.length);
+    renderPickupTable();
+    renderRecent();
+  });
+
+  function toCSV(rows){
+    const pickupFileNameEl = document.getElementById('pickupFileName');
+    const hospital = (pickupFileNameEl?.textContent || 'Unknown Hospital').trim() || 'Unknown Hospital';
+    const exportedAt = new Date().toLocaleString();
+    const header = ['Hospital','Exported At','Time','Scan','Product','Raw Lot','Status'];
+    const escape = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+    const lines = [header.map(escape).join(',')];
+    if(rows.length){ rows.forEach(r => lines.push([hospital, exportedAt, r.time, r.type, r.product||'', r.lot||'', r.status].map(escape).join(','))); }
+    else { lines.push([hospital, exportedAt, '', '', '', '', ''].map(escape).join(',')); }
+    return '\ufeff' + lines.join('\r\n');
+  }
+  async function downloadCSV(){
+    const csv = toCSV(recent);
+    const ts = new Date().toISOString().replace(/[:T]/g,'-').split('.')[0];
+    const filename = 'recent_scans_' + ts + '.csv';
+    try {
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+      const file = new File([blob], filename, {type:'text/csv'});
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Recent Scans', text: 'CSV export' });
+        return;
+      }
+    } catch (e) {}
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+  }
+  btnDownloadLog.addEventListener('click', downloadCSV);
+
+  const inputTemplate = document.getElementById('inputTemplate');
+  const inputPickup   = document.getElementById('inputPickup');
+  const templateFileNameEl = document.getElementById('templateFileName');
+  const templateCountEl    = document.getElementById('templateCount');
+  const pickupFileNameEl   = document.getElementById('pickupFileName');
+  const pickupCountEl      = document.getElementById('pickupCount');
+  const btnLoadBoth        = document.getElementById('btnLoadBoth');
+
+  function normalizeProduct(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+  function lotNum(s){ return String(s||'').replace(/\D+/g,''); }
+  /* ---------- Smart barcode parsers (GS1 + custom HIBC) ---------- */
+  function _normALNUM(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+  function _digitsOnly(s){ return String(s||'').replace(/\D+/g,''); }
+
+  // GS1 concatenated: AI (01) GTIN (14 digits) and AI (10) LOT (variable length)
+  function parseGS1Pair(raw){
+    const s = String(raw||'').trim();
+    const m01 = s.match(/01(\d{14})/);
+    if(!m01) return null;
+    const gtin14 = m01[1];
+    const idx10 = s.indexOf('10', (m01.index||0)+16);
+    if(idx10 < 0) return null;
+    const tail = s.slice(idx10+2);
+    // stop at next AI (two digits) if present
+    const mNext = tail.match(/(?:^|.)(\d{2})(?=\d)/);
+    const lot = _normALNUM(mNext ? tail.slice(0, tail.indexOf(mNext[1])) : tail);
+    if(!lot) return null;
+    return { product: gtin14, lot };
+  }
+  // Convert GTIN to a stock-style key: trim leading zeros.
+  function gtinToStockKey(gtin14){ return String(gtin14||'').replace(/^0+/, ''); }
+
+  // Custom HIBC rule (per your spec):
+  // Ignore first 5 chars after +H, split at '/', left drop last 1 -> product,
+  // right drop first 5 and last 4 (fallback last 3) -> lot.
+  function parseHIBC_byRule(raw){
+    const s = String(raw||'').trim();
+    if(!/^\+H/i.test(s)) return null;
+    const body = s.slice(2); // remove '+H'
+    const slash = body.indexOf('/');
+    if(slash < 0) return null;
+    const left  = body.slice(0, slash);
+    const right = body.slice(slash + 1);
+
+    // Per your rule: ignore the 3-digit prefix AFTER '+H', then drop the single digit before '/'
+    // So left side: drop first 3, then drop last 1 => product
+    const productRaw = left.slice(3, -1);
+
+    // Right side: drop first 5 after '/', and drop last 4 overall to get the lot.
+    // If last-4 is too short, retry with last-3 variant.
+    let lotRaw = right.slice(5, -4);
+    if((lotRaw||'').length < 4) lotRaw = right.slice(5, -3);
+
+    const product = String(productRaw||'').replace(/\D+/g,'');
+    const lot     = String(lotRaw||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!product || !lot) return null;
+    return { product, lot };
+  }
+
+  
+  function isZTag(raw){
+    const parts = String(raw||'').trim().split('-').map(x=>x.trim()).filter(Boolean);
+    return parts.length>=3 && /^z$/i.test(parts[0]);
+  }
+  function zKey(product, lot){
+    return normalizeProduct(product) + '|' + lotNum(lot);
+  }
+
+  function hasActivePickup(product, lot){
+    const key = zKey(product, lot);
+    // A pickup is 'active' if a PICKUP entry exists in Recent; duplicates don't count, and Undo removes the entry
+    return recent.some(e => e.status==='PICKUP' && normalizeProduct(e.product)===normalizeProduct(product) && lotNum(e.lot)===lotNum(lot));
+  }
+  function countCSVLines(text){ return text.split(/\r?\n/).filter(line => line.trim().length > 0).length; }
+  function trimExtension(filename){ return filename.replace(/\.[^/.]+$/, ''); }
+  function shortBaseName(name){ const base = name.split(/[\\/]/).pop() || name; return trimExtension(base); }
+
+  function readPickupRows(text){
+    byId.clear();
+    nextRowId = 1;
+    let rows = csvParse(text).filter(r => r.length && r.some(v => (v||'').trim() !== ''));
+    if(rows.length > 0 && looksLikeHeader(rows[0])) rows = rows.slice(1);
+    const mapped = rows.map((r, idx) => {
+      const clsRaw = (r[3]||'').trim();
+      const clsUp = clsRaw.toUpperCase();
+      const clsAbbr = clsUp.startsWith('IMPLANT') ? 'IMPL' : (clsUp.startsWith('INSTRUMENT') ? 'INST' : clsRaw);
+      const qty = toIntOrZero(r[2]);
+      const obj = {
+        _id: nextRowId++,
+        product: (r[0]||'').trim(),
+        description: (r[1]||'').trim(),
+        qty,
+        productClass: clsAbbr,
+        serial: (r[4]||'').trim(),
+        remaining: qty,
+        active: qty>0,
+        originalIndex: idx
+      };
+      byId.set(obj._id, obj);
+      return obj;
+    });
+    return mapped;
+  }
+
+  // Parse GTIN CSV: expects columns [Item Number, EDI Number, Description, Class, Type, GTIN]
+  function readGTINMap(text){
+    gtinMap.clear();
+    let rows = csvParse(text).filter(r => r.length && r.some(v => (v||'').trim()!==''));
+    // drop header if it contains "GTIN"
+    if(rows.length && rows[0].some(c => /gtin/i.test(String(c)))) rows = rows.slice(1);
+    let count = 0;
+    for(const r of rows){
+      const item = (r[0]||'').trim();
+      const edi  = (r[1]||'').trim();
+      const gtin = (r[5]||'').trim();
+      const key12 = normalizeDigits(gtin);
+      if(!key12) continue;
+      gtinMap.set(key12, { itemNumber:item, edi:edi, gtin:key12 });
+      count++;
+    }
+    return count;
+  }
+
+  async function handleGTINChosen(file){
+    if(!file) return;
+    const text = await readFileAsync(file);
+    const count = readGTINMap(text);
+    setGTINLoaded(count>0, (file && file.name || ''), count);
+  }
+
+  async function autoLoadConfig(){
+    try{
+      const respTemplate = await fetch('ZTAG.csv');
+      if(respTemplate.ok){
+        const text = await respTemplate.text();
+        applyTemplateText('ZTAG.csv', text);
+      } else {
+        console.warn('ZTAG.csv auto-load failed: HTTP ' + respTemplate.status);
+      }
+    } catch(e){
+      console.warn('ZTAG.csv auto-load error', e);
+    }
+
+    try{
+      const respGTIN = await fetch('GTIN.csv');
+      if(respGTIN.ok){
+        const text = await respGTIN.text();
+        const count = readGTINMap(text);
+        setGTINLoaded(count>0, 'GTIN.csv', count);
+      } else {
+        console.warn('GTIN.csv auto-load failed: HTTP ' + respGTIN.status);
+      }
+    } catch(e){
+      console.warn('GTIN.csv auto-load error', e);
+    }
+  }
+
+  function readFileAsync(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result || '');
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  }
+
+
+    function applyTemplateText(sourceName, text){
+    const rowCount = countCSVLines(text);
+    if (typeof templateFileNameEl !== 'undefined' && templateFileNameEl) {
+      templateFileNameEl.textContent = shortBaseName(sourceName || '');
+    }
+    if (typeof templateCountEl !== 'undefined' && templateCountEl) {
+      templateCountEl.textContent = 'Rows loaded: ' + rowCount;
+    }
+    const btn = document.getElementById('btnLoadTemplate');
+    if (btn) {
+      btn.classList.add('loaded');
+    }
+
+    // Build lookup strictly from Column A (middle) and Column B (product)
+    try{
+      templateMap.clear();
+      let rows = csvParse(text).filter(r => r && r.length && r.some(v => (v||'').trim()!==''));
+      // Optional header skip: if first row col A is not numeric, drop it
+      if(rows.length){
+        const a0 = String(rows[0][0]||'');
+        if(!/^\d+$/.test(a0.replace(/\D+/g,''))){ rows = rows.slice(1); }
+      }
+      for(const r of rows){
+        const colA = (r[0]||'').toString();
+        const colB = (r[1]||'').toString();
+        const key = colA.replace(/\D+/g,'');
+        const product = colB.trim();
+        if(key && product){ templateMap.set(key, { productCode: product }); }
+      }
+    }catch(e){ console.warn('Template A/B parse warning (non-fatal):', e); }
+  }
+
+  async function handleTemplateChosen(file){
+    if(!file) return;
+    templateFileObj = file;
+    const text = await readFileAsync(file);
+    applyTemplateText(file.name, text);
+
+    if (sequentialLoadMode && !pickupFileObj) {
+      setTimeout(() => { inputPickup.click(); }, 50);
+    }
+  }
+
+  async function handlePickupChosen(file){
+    if(!file) return;
+    pickupFileObj = file;
+    const text = await readFileAsync(file);
+    const rowCount = countCSVLines(text);
+    pickupFileNameEl.textContent = shortBaseName(file.name);
+    pickupCountEl.textContent = 'Rows loaded: ' + rowCount;
+    document.getElementById('btnLoadPickup').classList.add('loaded');
+    try {
+      pickupData = readPickupRows(text);
+      window.pickupData = pickupData;
+      window.pickupData = pickupData;
+      applySort();
+      renderPickupTable();
+      setStatus('green','Hospital Pickup Loaded');
+    } catch(err){
+      console.error('CSV parse error:', err);
+      pickupData = [];
+      window.pickupData = pickupData;
+      renderPickupTable();
+      setStatus('red','Pickup CSV Error');
+    } finally {
+      sequentialLoadMode = false;
+    }
+  }
+
+    if(inputTemplate){ inputTemplate.addEventListener('change', (e) => handleTemplateChosen(e.target.files[0])); }
+  if(inputPickup){ inputPickup.addEventListener('change',   (e) => handlePickupChosen(e.target.files[0])); }
+  const inputGTIN = document.getElementById('inputGTIN');
+  if(inputGTIN){ inputGTIN.addEventListener('change', (e)=> handleGTINChosen(e.target.files[0])); }
+
+  if(btnLoadBoth){
+    btnLoadBoth.addEventListener('click', async () => {
+      if(!templateFileObj && !pickupFileObj){
+        sequentialLoadMode = true;
+        if(inputTemplate){ inputTemplate.click(); }
+        return;
+      }
+      if(!templateFileObj){ if(inputTemplate){ inputTemplate.click(); } return; }
+      if(!pickupFileObj){ if(inputPickup){ inputPickup.click(); } return; }
+      try {
+        const text = await readFileAsync(pickupFileObj);
+        pickupData = readPickupRows(text);
+        window.pickupData = pickupData;
+        window.pickupData = pickupData;
+        applySort();
+        renderPickupTable();
+        setStatus('green','Files Loaded');
+      } catch (e) {
+        console.error(e);
+        setStatus('red','Reload Failed');
+      }
+    });
+  }
+
+  autoLoadConfig();
+
+  renderRecent();
+  setSortIndicator();
+  resetStatus();
+})();
+</script>
+
+<script>
+(function(){
+  function mapHeaders(table){
+    const ths = Array.from(table.querySelectorAll('thead th'));
+    const map = { action: -1 };
+    ths.forEach((th, idx)=>{
+      const t = (th.textContent || '').trim().toLowerCase();
+      if (t === 'action') { map.action = idx; th.classList.add('action-col'); }
+      if (idx === 0) th.classList.add('num-col');
+    });
+    return map;
+  }
+
+  function applyBox3(){
+    const table = document.getElementById('stockTable') ||
+                  document.querySelector('table[data-box="3"]') ||
+                  document.querySelector('#box3 table') ||
+                  document.querySelector('table'); // last-resort
+    if (!table) return;
+    const map = mapHeaders(table);
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(tr=>{
+      const tds = tr.children;
+      if (tds.length){
+        // First column (#) center
+        if (tds[0]) tds[0].classList.add('num-col');
+        // Action column centering
+        if (map.action >= 0 && tds[map.action]){
+          tds[map.action].classList.add('action-col');
+          // Ensure button looks right
+          const btn = tds[map.action].querySelector('button, .btn');
+          if (btn){
+            btn.classList.add('btn-pickup');
+            btn.style.display = 'inline-block';
+            btn.style.margin = '0 auto';
+            btn.style.width = 'auto';
+          }
+        }
+      }
+    });
+  }
+
+  function applyBox5(){
+    const recent = document.getElementById('recentTable') ||
+                   document.querySelector('#recentPanel table') ||
+                   document.querySelector('table[data-box="5"]');
+    if (!recent) return;
+    // Nothing else to do: CSS centers all th/td for this table
+  }
+
+  function run(){
+    applyBox3();
+    applyBox5();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+  window.addEventListener('load', run);
+
+  // Re-apply after dynamic updates (sorting / re-render)
+  const mo = new MutationObserver(run);
+  mo.observe(document.body, {childList:true, subtree:true});
+})();
+</script>
+
+
+<script>
+(function(){
+  function csvEscape(s){
+    s = String(s == null ? '' : s);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function expandClass(abbr){
+    const t = String(abbr||'').trim().toUpperCase();
+    if (t === 'IMPL') return 'Implant';
+    if (t === 'INST') return 'Instrument';
+    return abbr || '';
+  }
+  function exportMissing(){
+    try{
+      if (!window.pickupData || !Array.isArray(window.pickupData)){
+        alert('No pickup data loaded yet.');
+        return;
+      }
+      const rows = window.pickupData.filter(r => r && r.active && (r.remaining||0) > 0);
+      if (!rows.length){
+        alert('Nothing missing. All items picked up.');
+        return;
+      }
+      const header = ['Product','Description','Serial','Missing','Product Class'];
+      const lines = [header.map(csvEscape).join(',')];
+      rows.forEach(r => {
+        lines.push([
+          r.product || '',
+          r.description || '',
+          r.serial || '',
+          (r.remaining != null ? r.remaining : ''),
+          expandClass(r.productClass)
+        ].map(csvEscape).join(','));
+      });
+      const csv = "\ufeff" + lines.join("\r\n");
+      const d = new Date();
+      const ts = d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + '_' + pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds());
+      const filename = 'Missing_' + ts + '.csv';
+
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 800);
+    }catch(e){
+      console.error('Export Missing error:', e);
+      alert('Could not export CSV (see console).');
+    }
+  }
+
+  function bindExport(){
+    const btn = document.getElementById('btnExportMissing');
+    if (!btn) return;
+    if (!btn.__bound){
+      btn.addEventListener('click', exportMissing);
+      btn.__bound = true;
+    }
+  }
+
+  // Initial bind on DOM ready & on window load
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', bindExport);
+  } else {
+    bindExport();
+  }
+  window.addEventListener('load', bindExport);
+
+  // Re-bind if Box 4 is rebuilt (some flows replace its innerHTML)
+  const box4 = document.getElementById('box4') || document.querySelector('[data-box="4"]');
+  if (box4 && 'MutationObserver' in window){
+    const mo = new MutationObserver(() => bindExport());
+    mo.observe(box4, {childList:true, subtree:true});
+  }
+  // Safety: periodic re-bind (covers any late async rebuilds)
+  setInterval(bindExport, 1000);
+})();
+</script>
+
+
+<script>
+(function(){
+  // Hard-rebind Download Log to DOM-based Recent Scans CSV (no share sheet)
+  function csvEscape(s){
+    s = String(s == null ? '' : s);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+  function pad2(n){ return String(n).padStart(2,'0'); }
+
+  function findRecentTable(){
+    // Prefer Box 5
+    const t = document.querySelector('#box5 table, [data-box="5"] table');
+    if (t) return t;
+    // Fallback: any table whose header contains "time" and "product"
+    const tables = document.querySelectorAll('table');
+    for (const tb of tables){
+      const ths = Array.from(tb.querySelectorAll('thead th')).map(th => (th.textContent||'').trim().toLowerCase());
+      if (ths.some(x=>x.includes('time')) && ths.some(x=>x.includes('product'))) return tb;
+    }
+    return null;
+  }
+  function mapRecentHeaders(table){
+    const ths = Array.from(table.querySelectorAll('thead th')).map(th => (th.textContent||'').trim().toLowerCase());
+    function idxOf(names){
+      for (let i=0;i<ths.length;i++){
+        const t = ths[i];
+        for (const n of names){
+          if (t === n || t.includes(n)) return i;
+        }
+      }
+      return -1;
+    }
+    return {
+      time  : idxOf(['time']),
+      scan  : idxOf(['scan','type']),
+      prod  : idxOf(['product','kit','item']),
+      lot   : idxOf(['raw lot','serial','lot']),
+      // status/designation are intentionally ignored
+    };
+  }
+  function collectRecentFromDOM(){
+    const table = findRecentTable();
+    if (!table) throw new Error('Recent Scans table not found');
+    const tbody = table.querySelector('tbody');
+    if (!tbody) throw new Error('Recent Scans body not found');
+    const map = mapRecentHeaders(table);
+    if (map.time<0 || map.scan<0 || map.prod<0 || map.lot<0){
+      throw new Error('Columns not found (need Time, Scan, Product, Serial/Lot)');
+    }
+    const rows = [];
+    for (const tr of tbody.querySelectorAll('tr')){
+      const tds = Array.from(tr.children);
+      const pick = idx => (idx>=0 && tds[idx]) ? (tds[idx].textContent||'').trim() : '';
+      rows.push({
+        time: pick(map.time),
+        type: pick(map.scan),
+        product: pick(map.prod),
+        lot: pick(map.lot)
+      });
+    }
+    return rows;
+  }
+
+  function exportRecentCSV(){
+    try{
+      const data = collectRecentFromDOM();
+      const header = ['Time','Scan','Product','Raw Lot'];
+      const lines = [header.map(csvEscape).join(',')];
+      data.forEach(r => {
+        lines.push([r.time, r.type, r.product, r.lot].map(csvEscape).join(','));
+      });
+      const csv = "\ufeff" + lines.join("\r\n");
+      const d = new Date();
+      const ts = d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'_'+pad2(d.getHours())+pad2(d.getMinutes())+pad2(d.getSeconds());
+      const filename = 'Recent_Scans_'+ts+'.csv';
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 800);
+    }catch(e){
+      console.error('Export Recent CSV failed:', e);
+      alert('Export failed: ' + e.message);
+    }
+  }
+
+  function bindRecentExport(){
+    const btn = document.getElementById('btnDownloadLog');
+    if (!btn) return;
+    // Remove any inline or previous handlers by cloning
+    const clone = btn.cloneNode(true);
+    btn.parentNode.replaceChild(clone, btn);
+    clone.addEventListener('click', exportRecentCSV, {passive:true});
+    clone.setAttribute('data-export','recent-csv');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindRecentExport);
+  else bindRecentExport();
+  window.addEventListener('load', bindRecentExport);
+
+  // Rebind if Box 5 re-renders
+  const box5 = document.getElementById('box5') || document.querySelector('[data-box="5"]');
+  if (box5 && 'MutationObserver' in window){
+    const mo = new MutationObserver(bindRecentExport);
+    mo.observe(box5, {childList:true, subtree:true});
+  }
+  // Safety: periodic rebind to override any legacy reattach
+  setInterval(bindRecentExport, 1000);
+})();
+</script>
+
+
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('./service-worker.js').catch(function(e){
+        console.log('SW registration failed', e);
+      });
+    });
+  }
+  </script>
+
+</body>
+</html>
