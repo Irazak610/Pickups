@@ -462,6 +462,54 @@ table.pickup tbody tr.main-row td:nth-child(2) {
 }
 </style>
 
+
+<style>
+/* Final iPhone tuning: shrink Box 3 fonts/padding and tighten padding so all columns fit */
+@media (max-width: 430px) {
+  /* Reduce inner padding on Box 3 container to reclaim horizontal space */
+  .row.stock {
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+  }
+
+  /* Make pickup table use full width and auto layout */
+  table.pickup {
+    width: 100% !important;
+    table-layout: auto !important;
+  }
+
+  /* General smaller padding & font for Box 3 cells */
+  table.pickup thead th,
+  table.pickup tbody tr.main-row td {
+    padding: 2px 3px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Product / Serial / Class slightly larger than rest but still compact */
+  table.pickup tbody tr.main-row td:nth-child(2), /* Product */
+  table.pickup tbody tr.main-row td:nth-child(3), /* Serial */
+  table.pickup tbody tr.main-row td:nth-child(4)  /* Class */ {
+    font-size: 0.8rem !important;
+  }
+
+  /* Tighten REM pill */
+  .remaining-pill {
+    font-size: 0.7rem !important;
+    padding: 1px 3px !important;
+    min-width: 2ch !important;
+  }
+
+  /* Tighten Pickup button */
+  td.center .btn-pickup,
+  td[data-action-cell="1"] .btn-pickup {
+    font-size: 0.7rem !important;
+    padding: 2px 5px !important;
+    width: auto !important;
+    display: inline-block !important;
+  }
+}
+</style>
+
 </head>
 <body>
   <div class="app">
